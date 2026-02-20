@@ -5,7 +5,7 @@ WORKDIR /app
 # Copy gradle files for caching
 COPY gradlew .
 RUN chmod +x gradlew
-COPY gradle gradle
+COPY gradle/ ./gradle/
 COPY build.gradle .
 COPY settings.gradle .
 
