@@ -10,7 +10,7 @@ import lombok.extern.slf4j.Slf4j;
 @Configuration
 public class DatabaseConfig {
 
-    @Bean
+    /*@Bean
     @Primary
     public javax.sql.DataSource dataSource(DataSourceProperties properties) {
         String databaseUrl = System.getenv("DATABASE_URL");
@@ -26,5 +26,5 @@ public class DatabaseConfig {
         return properties.initializeDataSourceBuilder()
                 .url(databaseUrl)
                 .build();
-    }
+    }*/
 }
