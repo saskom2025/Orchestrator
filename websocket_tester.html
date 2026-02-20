@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Intellifix WebSocket Tester</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/sockjs-client/1.6.1/sockjs.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/stomp.js/2.3.3/stomp.min.js"></script>
+    <style>
+        body { font-family: sans-serif; padding: 20px; background: #f4f7f6; }
+        #log { background: white; border: 1px solid #ccc; height: 300px; overflow-y: scroll; padding: 10px; margin-top: 20px; border-radius: 4px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .message { border-bottom: 1px solid #eee; padding: 5px 0; font-family: monospace; }
+        .status { font-weight: bold; padding: 2px 5px; border-radius: 3px; font-size: 0.8em; }
+        .status-COMPLETED { background: #d4edda; color: #155724; }
+        .status-PROCESSING { background: #fff3cd; color: #856404; }
+        .status-PENDING { background: #d1ecf1; color: #0c5460; }
+        .controls { margin-bottom: 10px; }
+        button { padding: 10px 20px; cursor: pointer; background: #007bff; color: white; border: none; border-radius: 4px; }
+        button:disabled { background: #ccc; }
+        input { padding: 10px; border: 1px solid #ccc; border-radius: 4px; }
+    </style>
+</head>
+<body>
+    <h2>Simulation Status Monitor</h2>
+    <div class="controls">
+        <button id="connect">Connect to WebSocket</button>
+        <button id="disconnect" disabled>Disconnect</button>
+        <span id="state" style="margin-left: 10px; color: #666;">Disconnected</span>
+    </div>
+    <div class="controls">
+        <input type="text" id="simIdInput" placeholder="Enter Simulation ID">
+        <button id="subscribeSim" disabled>Subscribe to ID</button>
+    </div>
+    <div id="log"></div>
+
+    <script>
+        var stompClient = null;
+
+        function setConnected(connected) {
+            document.getElementById('connect').disabled = connected;
+            document.getElementById('disconnect').disabled = !connected;
+            document.getElementById('subscribeSim').disabled = !connected;
+            document.getElementById('state').innerText = connected ? 'Connected' : 'Disconnected';
+            document.getElementById('state').style.color = connected ? 'green' : 'red';
+        }
+
+        function connect() {
+            var socket = new SockJS('http://localhost:8080/intellifix/orchestrator/ws');
+            stompClient = Stomp.over(socket);
+            stompClient.connect({}, function (frame) {
+                setConnected(true);
+                console.log('Connected: ' + frame);
+                appendLog("System", "WebSocket Connection Established", "CONNECTED");
+                
+                // Subscribe to ALL status updates
+                stompClient.subscribe('/topic/status/all', function (update) {
+                    var data = JSON.parse(update.body);
+                    appendLog("Sim ID: " + data.simId, data.message, data.status);
+                });
+            }, function(error) {
+                appendLog("Error", "Could not connect: " + error, "ERROR");
+            });
+        }
+
+        function disconnect() {
+            if (stompClient !== null) {
+                stompClient.disconnect();
+            }
+            setConnected(false);
+            console.log("Disconnected");
+        }
+
+        function subscribeToSim() {
+            var simId = document.getElementById('simIdInput').value;
+            if (simId && stompClient) {
+                stompClient.subscribe('/topic/status/' + simId, function (update) {
+                    var data = JSON.parse(update.body);
+                    appendLog("Sim ID: " + data.simId + " [Specific]", data.message, data.status);
+                });
+                appendLog("System", "Subscribed to status for Simulation ID: " + simId, "INFO");
+            }
+        }
+
+        function appendLog(simId, message, status) {
+            var log = document.getElementById('log');
+            var div = document.createElement('div');
+            div.className = 'message';
+            var time = new Date().toLocaleTimeString();
+            div.innerHTML = `[${time}] <b>${simId}</b>: ${message} <span class="status status-${status}">${status}</span>`;
+            log.prepend(div);
+        }
+
+        document.getElementById('connect').addEventListener('click', connect);
+        document.getElementById('disconnect').addEventListener('click', disconnect);
+        document.getElementById('subscribeSim').addEventListener('click', subscribeToSim);
+    </script>
+</body>
+</html>
