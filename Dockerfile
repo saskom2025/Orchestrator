@@ -2,18 +2,19 @@
 FROM eclipse-temurin:21-jdk-jammy AS build
 WORKDIR /app
 
-# Copy gradle files for caching
-COPY gradlew .
+# Copy everything
+COPY . .
+
+# Ensure gradlew is executable
 RUN chmod +x gradlew
-COPY gradle/ ./gradle/
-COPY build.gradle .
-COPY settings.gradle .
+
+# Diagnostic: find the jar
+RUN find . -name "gradle-wrapper.jar"
 
 # Download dependencies (optional but speeds up builds)
 RUN ./gradlew dependencies --no-daemon
 
-# Copy source and build
-COPY src src
+# Build
 RUN ./gradlew bootJar --no-daemon
 
 # Runtime stage
