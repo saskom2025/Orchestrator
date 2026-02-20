@@ -1,0 +1,11 @@
+build/
+.gradle/
+.idea/
+.vscode/
+bin/
+out/
+logs/
+.git/
+*.log
+gradlew.bat
+HELP.md
