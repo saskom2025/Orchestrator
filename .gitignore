@@ -1,7 +1,6 @@
 # Gradle
 .gradle/
 build/
-!gradle/wrapper/gradle-wrapper.jar
 
 # IDEA
 .idea/
@@ -24,6 +23,9 @@ logs/
 *.jar
 *.war
 *.ear
+
+# Correct exception for Gradle wrapper
+!gradle/wrapper/gradle-wrapper.jar
 
 # Eclipse
 .classpath
