@@ -12,6 +12,7 @@
         .status-COMPLETED { background: #d4edda; color: #155724; }
         .status-PROCESSING { background: #fff3cd; color: #856404; }
         .status-PENDING { background: #d1ecf1; color: #0c5460; }
+        .status-HEARTBEAT { background: #e2e3e5; color: #383d41; }
         .controls { margin-bottom: 10px; }
         button { padding: 10px 20px; cursor: pointer; background: #007bff; color: white; border: none; border-radius: 4px; }
         button:disabled { background: #ccc; }
@@ -19,7 +20,7 @@
     </style>
 </head>
 <body>
-    <h2>Simulation Status Monitor</h2>
+    <h2>Simulation & Health Monitor</h2>
     <div class="controls">
         <button id="connect">Connect to WebSocket</button>
         <button id="disconnect" disabled>Disconnect</button>
@@ -54,6 +55,12 @@
                 stompClient.subscribe('/topic/status/all', function (update) {
                     var data = JSON.parse(update.body);
                     appendLog("Sim ID: " + data.simId, data.message, data.status);
+                });
+
+                // Subscribe to ALL health heartbeats
+                stompClient.subscribe('/topic/health/all', function (update) {
+                    var data = JSON.parse(update.body);
+                    appendLog("Health [" + data.simId + "]", "Heartbeat from " + data.sessionId, "HEARTBEAT");
                 });
             }, function(error) {
                 appendLog("Error", "Could not connect: " + error, "ERROR");

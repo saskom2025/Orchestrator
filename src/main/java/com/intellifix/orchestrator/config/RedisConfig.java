@@ -35,6 +35,18 @@ public class RedisConfig {
     @Value("${redis.status.consumer.group:status_consumer}")
     private String statusConsumerGroup;
 
+    @Value("${redis.health.stream.name:fix_health_stream}")
+    private String healthStreamName;
+
+    @Value("${redis.health.consumer.group:health_consumer}")
+    private String healthConsumerGroup;
+
+    @Value("${redis.log.stream.name:fix_log_stream}")
+    private String logStreamName;
+
+    @Value("${redis.log.consumer.group:log_consumer}")
+    private String logConsumerGroup;
+
     @Bean
     public ObjectMapper redisObjectMapper() {
         ObjectMapper objectMapper = new ObjectMapper();
@@ -100,6 +112,40 @@ public class RedisConfig {
                 listener);
 
         log.info("Redis Status Stream Subscription started: {} -> {}", statusStreamName, statusConsumerGroup);
+        return subscription;
+    }
+
+    @Bean
+    public Subscription healthSubscription(
+            StreamMessageListenerContainer<String, MapRecord<String, String, String>> container,
+            com.intellifix.orchestrator.redis.HealthStreamListener listener,
+            RedisTemplate<String, Object> redisTemplate) {
+
+        initStreamGroup(redisTemplate, healthStreamName, healthConsumerGroup);
+
+        Subscription subscription = container.receive(
+                Consumer.from(healthConsumerGroup, "instance-1"),
+                StreamOffset.create(healthStreamName, ReadOffset.lastConsumed()),
+                listener);
+
+        log.info("Redis Health Stream Subscription started: {} -> {}", healthStreamName, healthConsumerGroup);
+        return subscription;
+    }
+
+    @Bean
+    public Subscription logSubscription(
+            StreamMessageListenerContainer<String, MapRecord<String, String, String>> container,
+            com.intellifix.orchestrator.redis.FixLogStreamListener listener,
+            RedisTemplate<String, Object> redisTemplate) {
+
+        initStreamGroup(redisTemplate, logStreamName, logConsumerGroup);
+
+        Subscription subscription = container.receive(
+                Consumer.from(logConsumerGroup, "instance-1"),
+                StreamOffset.create(logStreamName, ReadOffset.lastConsumed()),
+                listener);
+
+        log.info("Redis Log Stream Subscription started: {} -> {}", logStreamName, logConsumerGroup);
         return subscription;
     }
 

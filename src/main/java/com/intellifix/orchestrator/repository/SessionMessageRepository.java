@@ -1,0 +1,12 @@
+package com.intellifix.orchestrator.repository;
+
+import com.intellifix.orchestrator.entity.SessionMessageEntity;
+import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.stereotype.Repository;
+
+import java.util.List;
+
+@Repository
+public interface SessionMessageRepository extends JpaRepository<SessionMessageEntity, Long> {
+    List<SessionMessageEntity> findBySimulationSessionSimSessionId(Long simSessionId);
+}

@@ -1,0 +1,571 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>FIX Heartbeat Dashboard | Intellifix</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/sockjs-client/1.6.1/sockjs.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/stomp.js/2.3.3/stomp.min.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&family=JetBrains+Mono&display=swap"
+        rel="stylesheet">
+    <style>
+        :root {
+            --bg-color: #0d1117;
+            --card-bg: rgba(22, 27, 34, 0.8);
+            --text-primary: #c9d1d9;
+            --text-secondary: #8b949e;
+            --accent: #58a6ff;
+            --accent-hover: #1f6feb;
+            --success: #3fb950;
+            --danger: #f85149;
+            --border: #30363d;
+            --glass-border: rgba(255, 255, 255, 0.1);
+        }
+
+        * {
+            box-sizing: border-box;
+            transition: all 0.2s ease-in-out;
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background: var(--bg-color);
+            background-image:
+                radial-gradient(at 0% 0%, rgba(88, 166, 255, 0.05) 0, transparent 50%),
+                radial-gradient(at 100% 100%, rgba(63, 185, 80, 0.05) 0, transparent 50%);
+            color: var(--text-primary);
+            padding: 40px;
+            margin: 0;
+            min-height: 100vh;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 40px;
+            border-bottom: 1px solid var(--border);
+            padding-bottom: 20px;
+        }
+
+        h1 {
+            font-size: 24px;
+            font-weight: 700;
+            margin: 0;
+            background: linear-gradient(90deg, #58a6ff, #3fb950);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .controls {
+            display: flex;
+            gap: 12px;
+            align-items: center;
+            background: var(--card-bg);
+            padding: 20px;
+            border-radius: 12px;
+            border: 1px solid var(--border);
+            margin-bottom: 30px;
+            backdrop-filter: blur(10px);
+        }
+
+        .input-group {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+        }
+
+        .input-group label {
+            font-size: 12px;
+            color: var(--text-secondary);
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        input[type="text"] {
+            background: #161b22;
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            color: var(--text-primary);
+            padding: 10px 14px;
+            font-size: 14px;
+            font-family: 'JetBrains Mono', monospace;
+            width: 200px;
+        }
+
+        input[type="text"]:focus {
+            outline: none;
+            border-color: var(--accent);
+            box-shadow: 0 0 0 3px rgba(88, 166, 255, 0.2);
+        }
+
+        button {
+            padding: 10px 20px;
+            cursor: pointer;
+            border: none;
+            border-radius: 6px;
+            font-weight: 600;
+            font-size: 14px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-top: 18px;
+        }
+
+        #connect {
+            background: var(--accent);
+            color: white;
+        }
+
+        #connect:hover:not(:disabled) {
+            background: var(--accent-hover);
+        }
+
+        #disconnect {
+            background: #21262d;
+            color: var(--danger);
+            border: 1px solid var(--border);
+        }
+
+        #disconnect:hover:not(:disabled) {
+            background: #30363d;
+        }
+
+        button:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        #filter-status {
+            font-size: 14px;
+            font-weight: 700;
+            margin-top: 18px;
+            padding: 10px 16px;
+            border-radius: 6px;
+            display: none;
+            /* Hidden by default */
+            align-items: center;
+            gap: 8px;
+            border: 1px solid transparent;
+        }
+
+        #filter-status.active {
+            display: flex;
+            background: rgba(63, 185, 80, 0.1);
+            color: var(--success);
+            border-color: rgba(63, 185, 80, 0.2);
+        }
+
+        #filter-status.inactive {
+            display: flex;
+            background: rgba(248, 81, 73, 0.1);
+            color: var(--danger);
+            border-color: rgba(248, 81, 73, 0.2);
+        }
+
+        .status-badge {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 14px;
+            font-weight: 600;
+            margin-top: 18px;
+            margin-left: auto;
+            padding: 8px 16px;
+            border-radius: 20px;
+            background: rgba(248, 81, 73, 0.1);
+            color: var(--danger);
+            border: 1px solid rgba(248, 81, 73, 0.2);
+        }
+
+        .status-badge.online {
+            background: rgba(63, 185, 80, 0.1);
+            color: var(--success);
+            border: 1px solid rgba(63, 185, 80, 0.2);
+        }
+
+        .pulse {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: currentColor;
+            box-shadow: 0 0 0 0 currentColor;
+            animation: pulse-ring 1.5s cubic-bezier(0.24, 0, 0.38, 1) infinite;
+        }
+
+        @keyframes pulse-ring {
+            0% {
+                transform: scale(0.95);
+                box-shadow: 0 0 0 0 rgba(currentColor, 0.7);
+            }
+
+            70% {
+                transform: scale(1);
+                box-shadow: 0 0 0 10px rgba(currentColor, 0);
+            }
+
+            100% {
+                transform: scale(0.95);
+                box-shadow: 0 0 0 0 rgba(currentColor, 0);
+            }
+        }
+
+        .dashboard {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
+            gap: 24px;
+        }
+
+        .card {
+            background: var(--card-bg);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 24px;
+            backdrop-filter: blur(10px);
+            position: relative;
+            overflow: hidden;
+            animation: slideUp 0.3s ease-out;
+        }
+
+        .card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 4px;
+            height: 100%;
+            background: var(--success);
+        }
+
+        .card.dead::before {
+            background: var(--danger);
+        }
+
+        @keyframes slideUp {
+            from {
+                opacity: 0;
+                transform: translateY(20px);
+            }
+
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .card-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            margin-bottom: 20px;
+        }
+
+        .session-id {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 14px;
+            font-weight: 600;
+            color: var(--accent);
+            word-break: break-all;
+        }
+
+        .indicator-group {
+            display: flex;
+            flex-direction: column;
+            align-items: flex-end;
+            gap: 4px;
+        }
+
+        .indicator {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            flex-shrink: 0;
+        }
+
+        .status-label {
+            font-size: 10px;
+            font-weight: 800;
+            text-transform: capitalize;
+            letter-spacing: 0.5px;
+        }
+
+        .status-alive {
+            background-color: var(--success);
+            box-shadow: 0 0 12px var(--success);
+            color: var(--success);
+        }
+
+        .status-dead {
+            background-color: var(--danger);
+            box-shadow: 0 0 12px var(--danger);
+            color: var(--danger);
+        }
+
+        .card-body {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+
+        .info-row {
+            display: flex;
+            justify-content: space-between;
+            font-size: 13px;
+        }
+
+        .info-label {
+            color: var(--text-secondary);
+        }
+
+        .info-value {
+            color: var(--text-primary);
+            font-weight: 600;
+        }
+
+        .message-box {
+            margin-top: 15px;
+            background: #0d1117;
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            padding: 12px;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 11px;
+            color: var(--text-secondary);
+            max-height: 80px;
+            overflow-y: auto;
+            word-break: break-all;
+        }
+
+        /* Scrollbar styling */
+        ::-webkit-scrollbar {
+            width: 6px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: transparent;
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: var(--border);
+            border-radius: 10px;
+        }
+
+        ::-webkit-scrollbar-thumb:hover {
+            background: var(--text-secondary);
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <header>
+            <h1>FIX Heartbeat Dashboard</h1>
+        </header>
+
+        <div class="controls">
+            <div class="input-group">
+                <label for="sim-id-input">Sim ID Filter</label>
+                <input type="text" id="sim-id-input" placeholder="e.g. sim3 (Optional)" autofocus>
+            </div>
+
+            <button id="connect">
+                <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                    <path d="M5 12h14M12 5l7 7-7 7" />
+                </svg>
+                Start Monitoring
+            </button>
+
+            <button id="disconnect" disabled>
+                <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                    <path d="M18.36 6.64a9 9 0 1 1-12.73 0M12 2v10" />
+                </svg>
+                Stop
+            </button>
+
+            <span id="filter-status"></span>
+
+            <div id="connection-state" class="status-badge">
+                <div class="pulse"></div>
+                <span>Offline</span>
+            </div>
+        </div>
+
+        <div id="dashboard" class="dashboard">
+            <!-- Heartbeat cards will appear here -->
+        </div>
+    </div>
+
+    <script>
+        var stompClient = null;
+        var sessions = {};
+        var globalFilterTimer = null;
+        var currentFilter = null;
+        const TIMEOUT_SEC = 60; // 60 seconds threshold for InActive status
+
+        function updateConnectionState(connected) {
+            const connectBtn = document.getElementById('connect');
+            const disconnectBtn = document.getElementById('disconnect');
+            const simInput = document.getElementById('sim-id-input');
+            const stateContainer = document.getElementById('connection-state');
+            const stateLabel = stateContainer.querySelector('span');
+            const filterStatus = document.getElementById('filter-status');
+
+            connectBtn.disabled = connected;
+            disconnectBtn.disabled = !connected;
+            simInput.disabled = connected;
+
+            stateLabel.innerText = connected ? 'Monitoring active' : 'Disconnected';
+            stateContainer.className = connected ? 'status-badge online' : 'status-badge';
+
+            if (!connected) {
+                // Clear dashboard when disconnected
+                document.getElementById('dashboard').innerHTML = '';
+                sessions = {};
+                // Reset global filter status
+                filterStatus.style.display = 'none';
+                filterStatus.innerText = '';
+                filterStatus.className = '';
+                clearTimeout(globalFilterTimer);
+                currentFilter = null;
+            }
+        }
+
+        function connect() {
+            const simIdInput = document.getElementById('sim-id-input');
+            currentFilter = simIdInput.value.trim();
+
+            const socket = new SockJS('http://localhost:8080/intellifix/orchestrator/ws');
+            stompClient = Stomp.over(socket);
+            stompClient.debug = null;
+
+            stompClient.connect({}, function (frame) {
+                updateConnectionState(true);
+
+                // Determine topic based on Sim ID
+                const topic = currentFilter ? '/topic/health/' + currentFilter : '/topic/health/all';
+                console.log('Subscribing to: ' + topic);
+
+                stompClient.subscribe(topic, function (msg) {
+                    handleHeartbeat(JSON.parse(msg.body));
+                });
+            }, function (error) {
+                console.error('WebSocket Error: ' + error);
+                updateConnectionState(false);
+                alert('Connection failed. Please ensure the backend is running.');
+            });
+        }
+
+        function disconnect() {
+            if (stompClient !== null) {
+                stompClient.disconnect();
+                stompClient = null;
+            }
+            updateConnectionState(false);
+        }
+
+        function handleHeartbeat(data) {
+            const key = data.sessionId;
+            const now = new Date();
+
+            if (!sessions[key]) {
+                createSessionCard(key, data.simId);
+            }
+
+            const session = sessions[key];
+            session.lastSeen = now;
+
+            const card = session.element;
+            const indicator = card.querySelector('.indicator');
+            const statusLabel = card.querySelector('.status-label');
+
+            // On receiving a message, set label to Active and color to green
+            card.classList.remove('dead');
+            indicator.className = 'indicator status-alive';
+            statusLabel.className = 'status-label status-alive';
+            statusLabel.innerText = 'Active';
+            card.querySelector('.last-seen-val').innerText = now.toLocaleTimeString();
+            card.querySelector('.message-box').innerText = data.message;
+
+            // Update Global Filter Status if this message matches the filter
+            if (currentFilter && data.simId === currentFilter) {
+                updateGlobalFilterStatus('Active');
+            }
+
+            // Reset InActive timer (60s) for the specific session
+            clearTimeout(session.timer);
+            session.timer = setTimeout(() => {
+                indicator.className = 'indicator status-dead';
+                statusLabel.className = 'status-label status-dead';
+                statusLabel.innerText = 'InActive';
+                card.classList.add('dead');
+            }, TIMEOUT_SEC * 1000);
+        }
+
+        function updateGlobalFilterStatus(status) {
+            const filterStatus = document.getElementById('filter-status');
+            filterStatus.innerText = status === 'Active' ? 'Active' : 'In-Active';
+            filterStatus.className = status === 'Active' ? 'active' : 'inactive';
+            filterStatus.style.display = 'flex';
+
+            clearTimeout(globalFilterTimer);
+            globalFilterTimer = setTimeout(() => {
+                filterStatus.innerText = 'In-Active';
+                filterStatus.className = 'inactive';
+            }, TIMEOUT_SEC * 1000);
+        }
+
+        function createSessionCard(sessionId, simId) {
+            const dashboard = document.getElementById('dashboard');
+            const card = document.createElement('div');
+            card.className = 'card';
+            card.id = 'card-' + sessionId.replace(/[:\- @]/g, '_');
+
+            card.innerHTML = `
+                <div class="card-header">
+                    <span class="session-id">${sessionId}</span>
+                    <div class="indicator-group">
+                        <div class="indicator status-alive"></div>
+                        <span class="status-label status-alive">Active</span>
+                    </div>
+                </div>
+                <div class="card-body">
+                    <div class="info-row">
+                        <span class="info-label">Simulation ID</span>
+                        <span class="info-value">${simId}</span>
+                    </div>
+                    <div class="info-row">
+                        <span class="info-label">Last Heartbeat</span>
+                        <span class="last-seen-val info-value">${new Date().toLocaleTimeString()}</span>
+                    </div>
+                    <div class="message-box">Waiting for data...</div>
+                </div>
+            `;
+
+            dashboard.prepend(card); // New cards at the beginning
+            sessions[sessionId] = {
+                simId: simId,
+                element: card,
+                timer: null
+            };
+        }
+
+        document.getElementById('connect').addEventListener('click', connect);
+        document.getElementById('disconnect').addEventListener('click', disconnect);
+
+        // Allow "Enter" key to trigger connection
+        document.getElementById('sim-id-input').addEventListener('keypress', (e) => {
+            if (e.key === 'Enter' && !document.getElementById('connect').disabled) {
+                connect();
+            }
+        });
+    </script>
+</body>
+
+</html>
