@@ -126,6 +126,7 @@ public class FixLogStreamListener implements StreamListener<String, MapRecord<St
         SessionMessageEntity msgEntity = new SessionMessageEntity();
         msgEntity.setSimulationSession(sessionEntity);
         msgEntity.setMsgType(dto.messageType());
+        msgEntity.setMsgName(dto.messageDescription());
         msgEntity.setRawFixMsg(IntellifixUtils.parseFixMessage(dto.message()));
         msgEntity.setDateCreated(OffsetDateTime.now());
         msgEntity.setDateModified(OffsetDateTime.now());
