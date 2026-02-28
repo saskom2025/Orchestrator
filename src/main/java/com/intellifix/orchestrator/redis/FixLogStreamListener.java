@@ -90,6 +90,7 @@ public class FixLogStreamListener implements StreamListener<String, MapRecord<St
             persistMessage(simId, sessionId, logUpdate);
 
             // publish to WebSocket /topic/logs/simIdStr
+            //http://localhost:8080/intellifix/orchestrator/ws/topic/logs/{simId}
             log.info("Broadcasting FIX log message for simulation {}: {}", simIdStr, messageType);
             messagingTemplate.convertAndSend("/topic/logs/" + simIdStr, logUpdate);
             messagingTemplate.convertAndSend("/topic/logs/all", logUpdate);

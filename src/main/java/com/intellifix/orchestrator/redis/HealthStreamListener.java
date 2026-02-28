@@ -37,7 +37,7 @@ public class HealthStreamListener implements StreamListener<String, MapRecord<St
 
             // Read fields directly from the MapRecord instead of a nested JSON payload
             String simId = message.getValue().get("simId");
-            String sessionId = message.getValue().get("sessionId");
+            String sessionId = message.getValue().get("fixSessionId");
             String messageText = message.getValue().get("message");
 
             if (simId == null && sessionId == null) {
@@ -53,7 +53,10 @@ public class HealthStreamListener implements StreamListener<String, MapRecord<St
                     healthUpdate.sessionId());
 
             // Broadcast to a specific topic for this simulation heartbeat
-            messagingTemplate.convertAndSend("/topic/health/" + healthUpdate.simId(), healthUpdate);
+            // /topic/health/{simId}/{sessionId}
+            // /topic/health/34/FIX.4.4:CLIENT1->HUB
+            messagingTemplate.convertAndSend("/topic/health/" + healthUpdate.simId() + "/" + healthUpdate.sessionId(),
+                    healthUpdate);
             messagingTemplate.convertAndSend("/topic/health/all", healthUpdate);
 
             // Manual Acknowledgment

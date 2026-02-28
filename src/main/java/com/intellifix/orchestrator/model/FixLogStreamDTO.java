@@ -4,8 +4,9 @@ import lombok.Builder;
 
 @Builder
 public record FixLogStreamDTO(
-        String messageType,
+
         String simId,
         String sessionId,
+        String messageType,
         String message) {
 }

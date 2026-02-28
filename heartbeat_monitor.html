@@ -60,6 +60,7 @@
             margin: 0;
             background: linear-gradient(90deg, #58a6ff, #3fb950);
             -webkit-background-clip: text;
+            background-clip: text;
             -webkit-text-fill-color: transparent;
         }
 
@@ -372,7 +373,12 @@
         <div class="controls">
             <div class="input-group">
                 <label for="sim-id-input">Sim ID Filter</label>
-                <input type="text" id="sim-id-input" placeholder="e.g. sim3 (Optional)" autofocus>
+                <input type="text" id="sim-id-input" placeholder="e.g. sim3" autofocus>
+            </div>
+
+            <div class="input-group">
+                <label for="session-id-input">Session ID Filter</label>
+                <input type="text" id="session-id-input" placeholder="e.g. session123 (Optional)">
             </div>
 
             <button id="connect">
@@ -407,12 +413,14 @@
         var sessions = {};
         var globalFilterTimer = null;
         var currentFilter = null;
+        var currentSessionFilter = null;
         const TIMEOUT_SEC = 60; // 60 seconds threshold for InActive status
 
         function updateConnectionState(connected) {
             const connectBtn = document.getElementById('connect');
             const disconnectBtn = document.getElementById('disconnect');
             const simInput = document.getElementById('sim-id-input');
+            const sessionInput = document.getElementById('session-id-input');
             const stateContainer = document.getElementById('connection-state');
             const stateLabel = stateContainer.querySelector('span');
             const filterStatus = document.getElementById('filter-status');
@@ -420,6 +428,7 @@
             connectBtn.disabled = connected;
             disconnectBtn.disabled = !connected;
             simInput.disabled = connected;
+            sessionInput.disabled = connected;
 
             stateLabel.innerText = connected ? 'Monitoring active' : 'Disconnected';
             stateContainer.className = connected ? 'status-badge online' : 'status-badge';
@@ -439,7 +448,9 @@
 
         function connect() {
             const simIdInput = document.getElementById('sim-id-input');
+            const sessionIdInput = document.getElementById('session-id-input');
             currentFilter = simIdInput.value.trim();
+            currentSessionFilter = sessionIdInput.value.trim();
 
             const socket = new SockJS('http://localhost:8080/intellifix/orchestrator/ws');
             stompClient = Stomp.over(socket);
@@ -448,8 +459,11 @@
             stompClient.connect({}, function (frame) {
                 updateConnectionState(true);
 
-                // Determine topic based on Sim ID
-                const topic = currentFilter ? '/topic/health/' + currentFilter : '/topic/health/all';
+                // Determine topic based on Sim ID and Session ID
+                let topic = '/topic/health/all';
+                if (currentFilter && currentSessionFilter) {
+                    topic = '/topic/health/' + currentFilter + '/' + currentSessionFilter;
+                }
                 console.log('Subscribing to: ' + topic);
 
                 stompClient.subscribe(topic, function (msg) {
@@ -473,6 +487,14 @@
         function handleHeartbeat(data) {
             const key = data.sessionId;
             const now = new Date();
+
+            if (currentFilter && data.simId !== currentFilter) {
+                return; // Skip if it doesn't match our filter
+            }
+
+            if (currentSessionFilter && data.sessionId !== currentSessionFilter) {
+                return; // Skip if it doesn't match our session filter
+            }
 
             if (!sessions[key]) {
                 createSessionCard(key, data.simId);
@@ -561,6 +583,11 @@
 
         // Allow "Enter" key to trigger connection
         document.getElementById('sim-id-input').addEventListener('keypress', (e) => {
+            if (e.key === 'Enter' && !document.getElementById('connect').disabled) {
+                connect();
+            }
+        });
+        document.getElementById('session-id-input').addEventListener('keypress', (e) => {
             if (e.key === 'Enter' && !document.getElementById('connect').disabled) {
                 connect();
             }

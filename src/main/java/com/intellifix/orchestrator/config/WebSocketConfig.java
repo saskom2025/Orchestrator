@@ -14,6 +14,7 @@ public class WebSocketConfig implements WebSocketMessageBrokerConfigurer {
      * Connect to ws:http://localhost:8080/intellifix/orchestrator/ws and subscribe to
      * /topic/status/{simId}
      * http://localhost:8080/intellifix/orchestrator/ws/topic/status/{simId}
+     * http://localhost:8080/intellifix/orchestrator/ws/topic/logs/{simId}
      */
 
     @Override
