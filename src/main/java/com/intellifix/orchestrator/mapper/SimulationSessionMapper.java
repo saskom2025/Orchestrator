@@ -13,7 +13,7 @@ import org.mapstruct.Mapping;
 
 import java.util.List;
 
-@Mapper(componentModel = "spring", uses = { FixVersionMapper.class, UploadLogMapper.class })
+@Mapper(componentModel = "spring", uses = { FixVersionMapper.class, UploadLogMapper.class, StatusMapper.class })
 public interface SimulationSessionMapper {
 
     @Mapping(source = "simulation", target = "simulationDetail")
