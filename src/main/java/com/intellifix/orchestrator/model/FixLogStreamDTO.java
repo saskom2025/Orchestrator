@@ -8,5 +8,6 @@ public record FixLogStreamDTO(
         String simId,
         String sessionId,
         String messageType,
+        String messageDescription,
         String message) {
 }

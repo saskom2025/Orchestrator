@@ -61,6 +61,7 @@ public class FixLogStreamListener implements StreamListener<String, MapRecord<St
 
             Map<String, String> values = message.getValue();
             String messageType = values.get("messageType");
+            String messageDescription = values.get("messageDescription");
             String simIdStr = values.get("simId");
             String sessionId = values.get("sessionId");
             String fixMessage = values.get("message");
@@ -80,9 +81,10 @@ public class FixLogStreamListener implements StreamListener<String, MapRecord<St
             }
 
             FixLogStreamDTO logUpdate = FixLogStreamDTO.builder()
-                    .messageType(messageType)
                     .simId(simIdStr)
                     .sessionId(sessionId)
+                    .messageType(messageType)
+                    .messageDescription(messageDescription)
                     .message(fixMessage)
                     .build();
 
