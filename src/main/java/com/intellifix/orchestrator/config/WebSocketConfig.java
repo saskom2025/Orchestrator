@@ -13,8 +13,12 @@ public class WebSocketConfig implements WebSocketMessageBrokerConfigurer {
     /*
      * Connect to ws:http://localhost:8080/intellifix/orchestrator/ws and subscribe to
      * /topic/status/{simId}
+     * Simulation Status WS
      * http://localhost:8080/intellifix/orchestrator/ws/topic/status/{simId}
+     * FIX Log Message WS
      * http://localhost:8080/intellifix/orchestrator/ws/topic/logs/{simId}
+     * Session Heartbeat WS
+     * http://localhost:8080/intellifix/orchestrator/ws/topic/health/{simId}/{sessionId}
      */
 
     @Override
