@@ -1,8 +1,12 @@
 package com.intellifix.orchestrator.service;
 
+import com.intellifix.orchestrator.entity.SimulationEntity;
 import com.intellifix.orchestrator.entity.SimulationSessionEntity;
 import com.intellifix.orchestrator.mapper.SimulationSessionMapper;
 import com.intellifix.orchestrator.model.SimulationSessionDetailDTO;
+import com.intellifix.orchestrator.model.SimulationSessionObjectDTO;
+import com.intellifix.orchestrator.model.SimulationSessionSummaryDTO;
+import com.intellifix.orchestrator.repository.SimulationRepository;
 import com.intellifix.orchestrator.repository.SimulationSessionRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -18,6 +22,7 @@ import java.util.List;
 public class SimulationSessionService {
 
     private final SimulationSessionRepository simulationSessionRepository;
+    private final SimulationRepository simulationRepository;
     private final SimulationSessionMapper simulationSessionMapper;
 
     @Transactional(readOnly = true)
@@ -47,6 +52,33 @@ public class SimulationSessionService {
         log.info("Fetching session details for simulation ID: {}", simulationID);
         List<SimulationSessionEntity> sessions = simulationSessionRepository.findBySimulationSimId(simulationID);
         return simulationSessionMapper.toDetailDtoList(sessions);
+    }
+
+    @Transactional(readOnly = true)
+    public List<SimulationSessionObjectDTO> getSessionListBySimulationId(Long simulationID) {
+        if (simulationID == null) {
+            throw new IllegalArgumentException("Simulation ID cannot be null");
+        }
+        log.info("Fetching session list for simulation ID: {}", simulationID);
+        List<SimulationSessionEntity> sessions = simulationSessionRepository.findBySimulationSimId(simulationID);
+        return simulationSessionMapper.toSessionListDtoList(sessions);
+    }
+
+    @Transactional(readOnly = true)
+    public SimulationSessionSummaryDTO getSessionSummaryBySimulationId(Long simulationID) {
+        if (simulationID == null) {
+            throw new IllegalArgumentException("Simulation ID cannot be null");
+        }
+        log.info("Fetching session summary for simulation ID: {}", simulationID);
+        SimulationEntity simulation = simulationRepository.findById(simulationID)
+                .orElseThrow(() -> new RuntimeException("Simulation not found with ID: " + simulationID));
+
+        List<SimulationSessionObjectDTO> sessionObjects = simulationSessionRepository
+                .findSessionObjectsBySimulationId(simulationID);
+
+        return new SimulationSessionSummaryDTO(
+                simulationSessionMapper.toSimulationDetailDto(simulation),
+                sessionObjects);
     }
 
 }

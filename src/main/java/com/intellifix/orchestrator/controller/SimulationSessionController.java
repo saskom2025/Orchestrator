@@ -1,6 +1,8 @@
 package com.intellifix.orchestrator.controller;
 
 import com.intellifix.orchestrator.model.SimulationSessionDetailDTO;
+import com.intellifix.orchestrator.model.SimulationSessionObjectDTO;
+import com.intellifix.orchestrator.model.SimulationSessionSummaryDTO;
 import com.intellifix.orchestrator.service.SimulationSessionService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -22,7 +24,7 @@ public class SimulationSessionController {
         return simulationSessionService.getAllSessionDetail();
     }
 
-    @GetMapping("/{id}")
+    @GetMapping("/{sessionId}")
     public SimulationSessionDetailDTO getSessionDetailBySessionID(@PathVariable("id") Long sessionID) {
         return simulationSessionService.getSessionDetailBySessionID(sessionID);
     }
@@ -31,5 +33,10 @@ public class SimulationSessionController {
     @GetMapping("/simulation/{id}")
     public List<SimulationSessionDetailDTO> getSessionDetailBySimulationID(@PathVariable("id") Long simulationID) {
         return simulationSessionService.getSessionDetailBySimulationID(simulationID);
+    }
+
+    @GetMapping("/summary/{simId}")
+    public SimulationSessionSummaryDTO getSessionSummary(@PathVariable("simId") Long simulationID) {
+        return simulationSessionService.getSessionSummaryBySimulationId(simulationID);
     }
 }
