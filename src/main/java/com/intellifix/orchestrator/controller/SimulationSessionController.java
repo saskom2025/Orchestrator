@@ -24,7 +24,7 @@ public class SimulationSessionController {
         return simulationSessionService.getAllSessionDetail();
     }
 
-    @GetMapping("/{sessionId}")
+    @GetMapping("/{id}")
     public SimulationSessionDetailDTO getSessionDetailBySessionID(@PathVariable("id") Long sessionID) {
         return simulationSessionService.getSessionDetailBySessionID(sessionID);
     }
