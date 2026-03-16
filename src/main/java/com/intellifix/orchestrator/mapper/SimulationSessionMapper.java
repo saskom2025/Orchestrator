@@ -26,6 +26,8 @@ public interface SimulationSessionMapper {
 
     ValidationErrorDTO toValidationErrorDto(ValidationErrorEntity entity);
 
+    ValidationErrorEntity toValidationErrorEntity(ValidationErrorDTO dto);
+
     List<SimulationSessionDetailDTO> toDetailDtoList(List<SimulationSessionEntity> entities);
 
     @Mapping(source = "simSessionId", target = "sessionId")

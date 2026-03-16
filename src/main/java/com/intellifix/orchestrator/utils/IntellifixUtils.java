@@ -14,6 +14,7 @@ public class IntellifixUtils {
         try {
             return Long.parseLong(simIdStr);
         } catch (NumberFormatException e) {
+            log.error("Failed to parse Simulation Id : {}", simIdStr);
             return null;
         }
     }

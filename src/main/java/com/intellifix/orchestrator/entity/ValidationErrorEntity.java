@@ -22,8 +22,8 @@ public class ValidationErrorEntity {
     @Column(name = "error_code", length = 50)
     private String errorCode;
 
-    @Column(name = "tag_number")
-    private Integer tagNumber;
+    @Column(name = "tags")
+    private String tags;
 
     @Column(columnDefinition = "TEXT")
     private String description;

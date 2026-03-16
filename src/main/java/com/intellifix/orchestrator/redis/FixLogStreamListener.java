@@ -1,15 +1,21 @@
 package com.intellifix.orchestrator.redis;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
+import com.intellifix.orchestrator.config.FixMessageComparisonConfig;
 import com.intellifix.orchestrator.entity.SessionMessageEntity;
 import com.intellifix.orchestrator.entity.SimulationEntity;
 import com.intellifix.orchestrator.entity.SimulationSessionEntity;
+import com.intellifix.orchestrator.entity.ValidationErrorEntity;
+import com.intellifix.orchestrator.mapper.SimulationSessionMapper;
 import com.intellifix.orchestrator.model.FixLogStreamDTO;
+import com.intellifix.orchestrator.model.ValidationErrorDTO;
+import com.intellifix.orchestrator.redis.strategy.FixMessageStrategy;
 import com.intellifix.orchestrator.repository.SessionMessageRepository;
 import com.intellifix.orchestrator.repository.SimulationRepository;
 import com.intellifix.orchestrator.repository.SimulationSessionRepository;
 import com.intellifix.orchestrator.utils.IntellifixUtils;
 import lombok.extern.slf4j.Slf4j;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import org.apache.commons.lang3.StringUtils;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.redis.connection.stream.MapRecord;
 import org.springframework.data.redis.core.RedisTemplate;
@@ -19,11 +25,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.OffsetDateTime;
-import java.util.HashMap;
-import java.util.Map;
-import java.util.Objects;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
+import java.util.*;
 
 @Slf4j
 @Service
@@ -34,6 +36,10 @@ public class FixLogStreamListener implements StreamListener<String, MapRecord<St
     private final SimulationRepository simulationRepository;
     private final SimulationSessionRepository simulationSessionRepository;
     private final SessionMessageRepository sessionMessageRepository;
+    private final FixMessageComparisonConfig fixMessageComparisonConfig;
+    private final Map<String, FixMessageStrategy> strategies;
+    private final ObjectMapper objectMapper;
+    private final SimulationSessionMapper simulationSessionMapper;
 
     @Value("${redis.log.consumer.group:log_consumer}")
     private String logConsumerGroup;
@@ -42,12 +48,20 @@ public class FixLogStreamListener implements StreamListener<String, MapRecord<St
             RedisTemplate<String, Object> redisTemplate,
             SimulationRepository simulationRepository,
             SimulationSessionRepository simulationSessionRepository,
-            SessionMessageRepository sessionMessageRepository) {
+            SessionMessageRepository sessionMessageRepository,
+            FixMessageComparisonConfig fixMessageComparisonConfig,
+            Map<String, FixMessageStrategy> strategies,
+            ObjectMapper objectMapper,
+            SimulationSessionMapper simulationSessionMapper) {
         this.messagingTemplate = messagingTemplate;
         this.redisTemplate = redisTemplate;
         this.simulationRepository = simulationRepository;
         this.simulationSessionRepository = simulationSessionRepository;
         this.sessionMessageRepository = sessionMessageRepository;
+        this.fixMessageComparisonConfig = fixMessageComparisonConfig;
+        this.strategies = strategies;
+        this.objectMapper = objectMapper;
+        this.simulationSessionMapper = simulationSessionMapper;
     }
 
     @Override
@@ -65,8 +79,9 @@ public class FixLogStreamListener implements StreamListener<String, MapRecord<St
             String simIdStr = values.get("simId");
             String sessionId = values.get("sessionId");
             String fixMessage = values.get("message");
+            String error = values.get("error");
 
-            if (simIdStr == null || sessionId == null || fixMessage == null) {
+            if (StringUtils.isEmpty(simIdStr) || StringUtils.isEmpty(sessionId) || StringUtils.isEmpty(fixMessage)) {
                 log.error("Missing required fields in log stream message: {}", values);
                 acknowledge(message);
                 return;
@@ -74,28 +89,51 @@ public class FixLogStreamListener implements StreamListener<String, MapRecord<St
 
             // parse simIdStr
             Long simId = IntellifixUtils.extractSimId(simIdStr);
-            if (simId == null) {
+            if (Objects.isNull(simId)) {
                 log.error("Error parsing simId from: {}", simIdStr);
                 acknowledge(message);
                 return;
             }
+            // Enrich Log Message Stream to persist
+            ValidationErrorDTO validationErrorDTO = null;
+            try {
+                if (StringUtils.isNotEmpty(error)) {
+                    validationErrorDTO = objectMapper.readValue(error, ValidationErrorDTO.class);
+                }
+            } catch (Exception e) {
+                log.error("Error parsing validation error JSON: {}", error, e);
+            }
 
-            FixLogStreamDTO logUpdate = FixLogStreamDTO.builder()
+            FixLogStreamDTO logMessage = FixLogStreamDTO.builder()
                     .simId(simIdStr)
                     .sessionId(sessionId)
                     .messageType(messageType)
                     .messageDescription(messageDescription)
                     .message(fixMessage)
+                    .error(validationErrorDTO)
                     .build();
+            // Fetch Simulation entity from DB
+            SimulationEntity simulationEntity = simulationRepository.findById(simId)
+                    .orElseThrow(() -> new RuntimeException("Simulation not found for ID: " + simId));
+
+            // Extract SenderCompID (tag 49) from FIX message
+            Map<String, Object> parsedFix = IntellifixUtils.parseFixMessage(fixMessage);
+            String senderCompId = (String) parsedFix.get("49");
+            String targetCompId = simulationEntity.getClientSimulator().getTargetCompId();
+
+            if (isMessageEligibleForAiAnalysis(messageType, senderCompId, targetCompId)) {
+                log.info("Processing message for AI: type={}, sender={}", messageType, targetCompId);
+                // call to AI logic here
+            }
 
             // persist to db tables to save state
-            persistMessage(simId, sessionId, logUpdate);
+            persistMessage(simulationEntity, simId, sessionId, logMessage);
 
             // publish to WebSocket /topic/logs/simIdStr
-            //http://localhost:8080/intellifix/orchestrator/ws/topic/logs/{simId}
+            // http://localhost:8080/intellifix/orchestrator/ws/topic/logs/{simId}
             log.info("Broadcasting FIX log message for simulation {}: {}", simIdStr, messageType);
-            messagingTemplate.convertAndSend("/topic/logs/" + simIdStr, logUpdate);
-            messagingTemplate.convertAndSend("/topic/logs/all", logUpdate);
+            messagingTemplate.convertAndSend("/topic/logs/" + simIdStr, logMessage);
+            // messagingTemplate.convertAndSend("/topic/logs/all", logMessage);
 
             // Manual Acknowledgment
             acknowledge(message);
@@ -106,9 +144,18 @@ public class FixLogStreamListener implements StreamListener<String, MapRecord<St
         }
     }
 
-    private void persistMessage(Long simId, String sessionId, FixLogStreamDTO dto) {
-        SimulationEntity simulationEntity = simulationRepository.findById(simId)
-                .orElseThrow(() -> new RuntimeException("Simulation not found for ID: " + simId));
+    private boolean isMessageEligibleForAiAnalysis(String messageType, String senderCompId, String targetCompId) {
+        List<String> eligibleTypes = fixMessageComparisonConfig.getMessageTypes();
+        if (eligibleTypes == null || !eligibleTypes.contains(messageType)) {
+            return false;
+        }
+        // Differennt message startegies can be extended for custom filter logic
+        return Optional.ofNullable(strategies.get(messageType))
+                .map(strategy -> strategy.isEligible(senderCompId, targetCompId))
+                .orElse(false);
+    }
+
+    private void persistMessage(SimulationEntity simulationEntity, Long simId, String sessionId, FixLogStreamDTO dto) {
 
         SimulationSessionEntity sessionEntity = simulationSessionRepository
                 .findByFixSessionIdAndSimulationSimId(sessionId, simId)
@@ -133,6 +180,15 @@ public class FixLogStreamListener implements StreamListener<String, MapRecord<St
 
         // Extract sequence number tag 34
         msgEntity.setSeqNum(IntellifixUtils.extractSeqNum(dto.message()));
+
+        if (dto.error() != null) {
+            ValidationErrorEntity errorEntity = simulationSessionMapper.toValidationErrorEntity(dto.error());
+            errorEntity.setSessionMessage(msgEntity);
+            errorEntity.setDateCreated(OffsetDateTime.now());
+            errorEntity.setDateModified(OffsetDateTime.now());
+            msgEntity.setValidationErrors(Collections.singletonList(errorEntity));
+            msgEntity.setIsValid(false);
+        }
 
         sessionMessageRepository.save(msgEntity);
     }

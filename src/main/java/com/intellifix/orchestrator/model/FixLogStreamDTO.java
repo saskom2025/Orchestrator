@@ -9,5 +9,6 @@ public record FixLogStreamDTO(
         String sessionId,
         String messageType,
         String messageDescription,
-        String message) {
-}
+        String message,
+        ValidationErrorDTO error
+) {}
