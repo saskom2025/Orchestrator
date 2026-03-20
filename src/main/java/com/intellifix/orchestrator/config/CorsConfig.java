@@ -13,7 +13,7 @@ public class CorsConfig {
             @Override
             public void addCorsMappings(CorsRegistry registry) {
                 registry.addMapping("/**")
-                        .allowedOrigins("http://intellifix-ui-uat.s3-website-ap-south-1.amazonaws.com")
+                        .allowedOrigins("http://intellifix-ui-uat.s3-website-ap-southeast-2.amazonaws.com")
                         .allowedMethods("GET", "POST", "PUT", "DELETE", "OPTIONS")
                         .allowedHeaders("*")
                         .allowCredentials(true);
